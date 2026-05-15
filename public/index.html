@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accessibility Guardian — Powered by Gemma4</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+  .hero { text-align: center; padding: 4rem 1rem 2rem; }
+  .logo { font-size: 3rem; margin-bottom: 0.5rem; }
+  h1 { font-size: 2.5rem; font-weight: 800; margin: 0 0 0.5rem; background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .tagline { color: #94a3b8; font-size: 1.1rem; max-width: 480px; margin: 0 auto 2.5rem; }
+  .form-card { background: #1e293b; border-radius: 16px; padding: 2rem; max-width: 600px; margin: 0 auto; box-shadow: 0 4px 24px rgba(0,0,0,.4); }
+  .input-row { display: flex; gap: 0.75rem; }
+  input[type="url"] { flex: 1; padding: 0.75rem 1rem; border-radius: 8px; border: 2px solid #334155; background: #0f172a; color: #e2e8f0; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+  input[type="url"]:focus { border-color: #60a5fa; }
+  input[type="url"]::placeholder { color: #475569; }
+  button[type="submit"] { padding: 0.75rem 1.5rem; border-radius: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; }
+  button[type="submit"]:hover:not(:disabled) { opacity: 0.85; }
+  button[type="submit"]:disabled { opacity: 0.5; cursor: not-allowed; }
+  .options { margin-top: 1rem; display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+  label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: #94a3b8; cursor: pointer; }
+  input[type="checkbox"] { accent-color: #6366f1; }
+  .progress-area { margin-top: 1.5rem; display: none; }
+  .progress-area.visible { display: block; }
+  .status-text { color: #94a3b8; font-size: 0.9rem; margin-bottom: 0.75rem; }
+  .progress-bar { height: 4px; background: #334155; border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6, #34d399); border-radius: 999px; transition: width 0.3s; }
+  .summary-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 1rem; }
+  .stat { text-align: center; background: #0f172a; border-radius: 8px; padding: 0.75rem 0.5rem; }
+  .stat-n { font-size: 1.5rem; font-weight: 700; }
+  .stat-l { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; margin-top: 0.2rem; }
+  .critical .stat-n { color: #f87171; }
+  .serious .stat-n { color: #fb923c; }
+  .moderate .stat-n { color: #fbbf24; }
+  .minor .stat-n { color: #60a5fa; }
+  .passed .stat-n { color: #4ade80; }
+  .report-area { max-width: 900px; margin: 2rem auto; padding: 0 1rem; display: none; }
+  .report-area.visible { display: block; }
+  .report-frame { background: white; border-radius: 12px; overflow: hidden; }
+  .report-frame iframe { width: 100%; border: none; min-height: 600px; }
+  .error-box { background: #450a0a; border: 1px solid #f87171; border-radius: 8px; padding: 1rem; color: #fca5a5; margin-top: 1rem; font-size: 0.9rem; display: none; }
+  .error-box.visible { display: block; }
+  .powered-by { margin-top: 1.5rem; font-size: 0.75rem; color: #475569; text-align: center; }
+  .powered-by a { color: #6366f1; text-decoration: none; }
+  .how { max-width: 680px; margin: 3rem auto; padding: 0 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1.5rem; text-align: center; }
+  .step { }
+  .step-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .step-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+  .step-desc { font-size: 0.8rem; color: #64748b; }
+  footer { text-align: center; padding: 2rem; color: #334155; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="logo">♿</div>
+  <h1>Accessibility Guardian</h1>
+  <p class="tagline">Scan any website for WCAG violations. Get plain-language explanations and developer fixes — powered by Gemma4.</p>
+
+  <div class="form-card">
+    <form id="scanForm">
+      <div class="input-row">
+        <input type="url" id="urlInput" placeholder="https://example.com" required autocomplete="url">
+        <button type="submit" id="submitBtn">Scan →</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="noAI"> Raw output only (skip Gemma4)</label>
+      </div>
+    </form>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="progress-area" id="progressArea">
+      <div class="status-text" id="statusText">Initializing...</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:5%"></div></div>
+      <div class="summary-stats" id="summaryStats" style="display:none">
+        <div class="stat critical"><div class="stat-n" id="sc">0</div><div class="stat-l">Critical</div></div>
+        <div class="stat serious"><div class="stat-n" id="ss">0</div><div class="stat-l">Serious</div></div>
+        <div class="stat moderate"><div class="stat-n" id="sm">0</div><div class="stat-l">Moderate</div></div>
+        <div class="stat minor"><div class="stat-n" id="smin">0</div><div class="stat-l">Minor</div></div>
+        <div class="stat passed"><div class="stat-n" id="sp">0</div><div class="stat-l">Passed</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="powered-by">Powered by <a href="https://ollama.ai" target="_blank" rel="noopener">Ollama</a> + gemma4:latest · Built for <a href="https://dev.to/challenges/google-gemma-2026-05-06" target="_blank" rel="noopener">DEV.to × Google Gemma challenge</a></div>
+</div>
+
+<div class="how">
+  <div class="step"><div class="step-icon">🎭</div><div class="step-title">Playwright scans</div><div class="step-desc">Headless browser loads the real page</div></div>
+  <div class="step"><div class="step-icon">🔍</div><div class="step-title">axe-core audits</div><div class="step-desc">Finds WCAG violations automatically</div></div>
+  <div class="step"><div class="step-icon">🤖</div><div class="step-title">Gemma4 explains</div><div class="step-desc">Translates issues into human language</div></div>
+  <div class="step"><div class="step-icon">📄</div><div class="step-title">Report generated</div><div class="step-desc">With fixes, code examples, priorities</div></div>
+</div>
+
+<div class="report-area" id="reportArea">
+  <div class="report-frame">
+    <iframe id="reportFrame" title="Accessibility Report" sandbox="allow-same-origin"></iframe>
+  </div>
+</div>
+
+<footer>Accessibility Guardian · Open source · MIT License</footer>
+
+<script>
+const form = document.getElementById('scanForm');
+const urlInput = document.getElementById('urlInput');
+const submitBtn = document.getElementById('submitBtn');
+const progressArea = document.getElementById('progressArea');
+const statusText = document.getElementById('statusText');
+const progressFill = document.getElementById('progressFill');
+const reportArea = document.getElementById('reportArea');
+const reportFrame = document.getElementById('reportFrame');
+const errorBox = document.getElementById('errorBox');
+const summaryStats = document.getElementById('summaryStats');
+
+let pollInterval;
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  clearInterval(pollInterval);
+  errorBox.classList.remove('visible');
+  reportArea.classList.remove('visible');
+  summaryStats.style.display = 'none';
+  progressArea.classList.add('visible');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Scanning...';
+  progressFill.style.width = '5%';
+  statusText.textContent = 'Launching browser...';
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, noAI: document.getElementById('noAI').checked }),
+    });
+    const { jobId, error } = await res.json();
+    if (error) throw new Error(error);
+    pollJob(jobId);
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
+function pollJob(jobId) {
+  pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/scan/${jobId}`);
+      const job = await res.json();
+
+      statusText.textContent = job.message || 'Working...';
+
+      if (job.status === 'scanning') {
+        progressFill.style.width = '25%';
+      } else if (job.status === 'analyzing') {
+        const pct = job.total ? 25 + Math.round((job.current / job.total) * 65) : 50;
+        progressFill.style.width = pct + '%';
+      } else if (job.status === 'done') {
+        clearInterval(pollInterval);
+        progressFill.style.width = '100%';
+
+        if (job.summary) {
+          document.getElementById('sc').textContent = job.summary.critical;
+          document.getElementById('ss').textContent = job.summary.serious;
+          document.getElementById('sm').textContent = job.summary.moderate;
+          document.getElementById('smin').textContent = job.summary.minor;
+          document.getElementById('sp').textContent = job.summary.passed;
+          summaryStats.style.display = 'grid';
+        }
+
+        if (job.html) {
+          reportArea.classList.add('visible');
+          const doc = reportFrame.contentDocument || reportFrame.contentWindow.document;
+          doc.open();
+          doc.write(job.html);
+          doc.close();
+          setTimeout(() => {
+            reportFrame.style.height = doc.body.scrollHeight + 'px';
+            reportArea.scrollIntoView({ behavior: 'smooth' });
+          }, 200);
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Scan →';
+      } else if (job.status === 'error') {
+        clearInterval(pollInterval);
+        showError(job.error || 'Scan failed');
+      }
+    } catch {
+      clearInterval(pollInterval);
+      showError('Lost connection to server');
+    }
+  }, 1000);
+}
+
+function showError(msg) {
+  errorBox.textContent = '❌ ' + msg;
+  errorBox.classList.add('visible');
+  progressArea.classList.remove('visible');
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Scan →';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "name": "web-accessibility-guardian",
+  "version": "1.0.0",
+  "description": "Scan websites for WCAG violations and get human-language explanations powered by Gemma4",
+  "main": "src/server.js",
+  "bin": {
+    "accessibility-guardian": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "scan": "node src/cli.js",
+    "dev": "node src/server.js"
+  },
+  "keywords": [
+    "accessibility",
+    "wcag",
+    "a11y",
+    "playwright",
+    "axe-core",
+    "gemma",
+    "ollama"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "express": "^5.2.1",
+    "playwright": "^1.60.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
