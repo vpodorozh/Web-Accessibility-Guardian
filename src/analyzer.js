@@ -4,7 +4,7 @@ const { buildExplanationPrompt, buildCodeFixPrompt } = require('./prompts');
 const ollamaAdapter = require('./adapters/ollama');
 const googleAiAdapter = require('./adapters/google-ai');
 
-const BATCH_SIZE = 3;
+const RETRY_DELAY_MS = 3000;
 
 const IMPACT_TO_PRIORITY = {
   critical: 'P0 - Fix immediately',
@@ -38,15 +38,9 @@ async function analyze(scanResult, onProgress, configOverrides = {}) {
 
   const enriched = [];
 
-  for (let i = 0; i < violations.length; i += BATCH_SIZE) {
-    const batch = violations.slice(i, i + BATCH_SIZE);
-    const results = await Promise.all(
-      batch.map((v, idx) => {
-        if (onProgress) onProgress(i + idx + 1, violations.length, v.id);
-        return enrichViolation(v, config);
-      })
-    );
-    enriched.push(...results);
+  for (let i = 0; i < violations.length; i++) {
+    if (onProgress) onProgress(i + 1, violations.length, violations[i].id);
+    enriched.push(await enrichViolation(violations[i], config));
   }
 
   return { ...scanResult, violations: enriched };
@@ -58,7 +52,7 @@ async function enrichViolation(violation, config) {
   // Call 1: text explanation (clean JSON, no code)
   let explanation;
   try {
-    const text = await adapter.generate(buildExplanationPrompt(violation), config);
+    const text = await withRetry(() => adapter.generate(buildExplanationPrompt(violation), config));
     explanation = parseExplanation(text);
   } catch (err) {
     return {
@@ -79,7 +73,7 @@ async function enrichViolation(violation, config) {
   // Call 2: code fix (plain text, no JSON) — optional, degrades gracefully
   let codeExample = { before: violation.nodes[0]?.html || '', after: '' };
   try {
-    const text = await adapter.generate(buildCodeFixPrompt(violation), config);
+    const text = await withRetry(() => adapter.generate(buildCodeFixPrompt(violation), config));
     codeExample = parseCodeFix(text);
   } catch {
     // non-fatal: keep raw HTML as before, leave after empty
@@ -138,6 +132,19 @@ function fallbackEnrich(scanResult) {
       aiEnriched: false,
     })),
   };
+}
+
+async function withRetry(fn, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt === retries) throw err;
+      const delay = RETRY_DELAY_MS * (attempt + 1);
+      process.stderr.write(`   ↻ retrying in ${delay / 1000}s (${err.message.slice(0, 80)})\n`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
 }
 
 module.exports = { analyze, fallbackEnrich };
