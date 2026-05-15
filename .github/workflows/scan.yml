@@ -17,14 +17,23 @@ on:
         default: 'gemma-4-31b-it'
         type: string
 
+# Only one scan runs at a time. Concurrent triggers queue and wait.
+concurrency:
+  group: accessibility-scan
+  cancel-in-progress: false
+
 permissions:
-  contents: write
+  contents: read
+  actions: read
   pages: write
   id-token: write
 
 jobs:
   scan:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -45,13 +54,11 @@ jobs:
       - name: Set report folder name
         run: echo "REPORT_ID=$(date -u +'%Y-%m-%d-%H%M%S')-${{ github.run_id }}" >> "$GITHUB_ENV"
 
-      - name: Restore previous reports from gh-pages
-        run: |
-          mkdir -p _site/reports
-          git fetch origin gh-pages --depth=1 2>/dev/null || true
-          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
-            git checkout origin/gh-pages -- reports 2>/dev/null && cp -r reports/. _site/reports/ && rm -rf reports || true
-          fi
+      - name: Restore previous reports from artifact
+        run: node src/fetch-reports-artifact.js _site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Run accessibility scan
         run: node src/cli.js --url "$SCAN_URL" --backend google-ai --model "$SCAN_MODEL" --api-key "$SCAN_API_KEY" --format html --output "_site/reports/$REPORT_ID/index.html"
@@ -64,16 +71,19 @@ jobs:
       - name: Prune old reports and build index
         run: node src/build-index.js _site
 
-      - name: Upload report as artifact (zip download)
+      - name: Upload reports archive (passed to next run)
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: accessibility-report-${{ env.REPORT_ID }}
-          path: _site/reports/${{ env.REPORT_ID }}/index.html
-          retention-days: 30
+          name: reports-archive
+          path: _site/reports/
+          retention-days: 8
+          overwrite: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
+        id: deploy
+        uses: actions/deploy-pages@v4
