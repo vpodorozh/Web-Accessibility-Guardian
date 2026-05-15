@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 'use strict';
 
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const { scan } = require('./scanner');
 const { analyze, fallbackEnrich } = require('./analyzer');
 const { reportCLI, reportHTML, reportJSON, writeReport } = require('./reporter');
+const { summarize } = require('./summarizer');
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -16,15 +18,17 @@ if (!args.url) {
   console.error('  --format cli|html|json    Output format (default: cli)');
   console.error('  --output <path>           Write report to file');
   console.error('  --no-ai                   Skip AI analysis, show raw axe-core output');
-  console.error('  --backend ollama|google-ai Backend to use (default: ollama, env: GEMMA_BACKEND)');
+  console.error('  --backend ollama|google-ai|openrouter  Backend to use (default: ollama, env: GEMMA_BACKEND)');
   console.error('  --model <name>            Model name (env: OLLAMA_MODEL)');
   console.error('  --ollama-url <url>        Ollama endpoint (env: OLLAMA_URL)');
-  console.error('  --api-key <key>           API key for remote/Google AI endpoints (env: GEMMA_API_KEY)');
+  console.error('  --api-key <key>           API key for OpenRouter/Google AI (env: OPENROUTER_API_KEY / GEMMA_API_KEY)');
+  console.error('  --summary-model <name>    Model for summaries (default: 26B MoE, env: SUMMARY_MODEL)');
   console.error('');
   console.error('Examples:');
   console.error('  node src/cli.js --url https://example.com');
   console.error('  node src/cli.js --url https://example.com --format html --output report.html');
   console.error('  node src/cli.js --url https://example.com --backend google-ai --api-key AIza...');
+  console.error('  node src/cli.js --url https://example.com --backend openrouter --api-key sk-or-v1-...');
   process.exit(1);
 }
 
@@ -34,6 +38,7 @@ const aiConfig = {
   backend: args.backend,
   url: args['ollama-url'],
   model: args.model,
+  summaryModel: args['summary-model'],
   apiKey: args['api-key'],
 };
 
@@ -50,7 +55,8 @@ const aiConfig = {
 
     if (!noAI && scanResult.violationCount > 0) {
       const backend = aiConfig.backend || process.env.GEMMA_BACKEND || 'ollama';
-      const model = aiConfig.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-4-26b-a4b-it' : 'gemma4:latest');
+      const DEFAULT_MODEL = { 'google-ai': 'gemma-4-26b-a4b-it', 'openrouter': 'google/gemma-4-31b-it:free', 'ollama': 'gemma4:latest' };
+      const model = aiConfig.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL[backend] || 'gemma4:latest';
       process.stdout.write(`\n🤖 Analyzing with ${model} [${backend}] (${scanResult.violationCount} violations)...\n`);
       result = await analyze(scanResult, (current, total, id) => {
         process.stdout.write(`   [${current}/${total}] ${id}\n`);
@@ -68,6 +74,21 @@ const aiConfig = {
           process.stderr.write(`\n❌ AI analysis failed for all violations. Check your API key and backend configuration.\n`);
           process.exitCode = 1;
         }
+      }
+
+      process.stdout.write(`\n🧠 Generating summaries (logical + persona)...\n`);
+      try {
+        const resolvedConfig = {
+          backend: aiConfig.backend || process.env.GEMMA_BACKEND || 'ollama',
+          url: aiConfig.url,
+          model: aiConfig.model,
+          summaryModel: aiConfig.summaryModel,
+          apiKey: aiConfig.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMMA_API_KEY || null,
+        };
+        result = { ...result, insights: await summarize(result, resolvedConfig) };
+        process.stdout.write(`✅ Summaries ready\n`);
+      } catch (err) {
+        process.stderr.write(`⚠️  Summary generation failed: ${err.message}\n`);
       }
     }
 

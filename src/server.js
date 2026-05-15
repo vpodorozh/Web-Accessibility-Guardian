@@ -1,9 +1,11 @@
 'use strict';
 
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { scan } = require('./scanner');
 const { analyze } = require('./analyzer');
+const { summarize } = require('./summarizer');
 const { reportHTML } = require('./reporter');
 
 const app = express();
@@ -67,8 +69,24 @@ async function runJob(jobId, url, noAI) {
         job.message = `Analyzing violation ${current}/${total} with Gemma4...`;
       });
 
-      job.html = reportHTML(enriched);
-      job.summary = buildSummary(enriched);
+      job.status = 'summarizing';
+      job.message = 'Generating logical and persona summaries...';
+
+      let insights = null;
+      try {
+        insights = await summarize(enriched, {
+          backend: process.env.GEMMA_BACKEND || 'ollama',
+          summaryModel: process.env.SUMMARY_MODEL || undefined,
+          apiKey: process.env.OPENROUTER_API_KEY || process.env.GEMMA_API_KEY || null,
+        });
+      } catch {
+        // non-fatal — report still renders without insights
+      }
+
+      const enrichedWithInsights = insights ? { ...enriched, insights } : enriched;
+      job.html = reportHTML(enrichedWithInsights);
+      job.summary = buildSummary(enrichedWithInsights);
+      job.insights = insights;
     } else {
       job.html = reportHTML(scanResult);
       job.summary = buildSummary(scanResult);

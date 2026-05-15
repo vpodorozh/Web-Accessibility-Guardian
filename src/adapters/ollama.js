@@ -13,7 +13,7 @@ async function generate(prompt, config) {
       stream: false,
       options: { temperature: 0.2, num_predict: 2048 },
     }),
-    signal: AbortSignal.timeout(60000),
+    signal: AbortSignal.timeout(300000),
   });
 
   if (!response.ok) throw new Error(`HTTP ${response.status} from ${config.url}`);

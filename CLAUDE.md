@@ -1,6 +1,6 @@
 # Accessibility Guardian
 
-Node.js CLI + web tool that scans websites for accessibility violations and uses Gemma4 (local via Ollama) to explain them in plain language with actionable developer fixes.
+Node.js CLI + web tool that scans websites for accessibility violations and uses Gemma 4 (via OpenRouter, Google AI, or local Ollama) to explain them in plain language with actionable developer fixes.
 
 ## Commands
 
@@ -16,11 +16,14 @@ node src/cli.js --url https://example.com
 node src/cli.js --url https://example.com --format html --output report.html
 node src/cli.js --url https://example.com --format json
 
+# Run with OpenRouter (default when GEMMA_BACKEND=openrouter in .env)
+node src/cli.js --url https://example.com --backend openrouter --api-key sk-or-v1-...
+
 # Start web UI
 node src/server.js
 # → http://localhost:3000
 
-# Start Ollama (must be running for AI analysis)
+# Start Ollama (only needed for ollama backend)
 ollama serve
 ```
 
@@ -29,7 +32,8 @@ ollama serve
 Pipeline: `scanner.js` → `analyzer.js` → `reporter.js`, orchestrated by `cli.js`.
 
 - **scanner.js** — Playwright Chromium headless + @axe-core/playwright → raw violations JSON
-- **analyzer.js** — Ollama REST API (localhost:11434) → gemma4:latest → enriched violations with 6 human fields
+- **analyzer.js** — pluggable AI backend (OpenRouter / Google AI / Ollama) → enriched violations with 6 human fields
+- **adapters/** — `openrouter.js` (OpenAI-compat), `google-ai.js`, `ollama.js`
 - **reporter.js** — renders to CLI (chalk), HTML (self-contained), or JSON
 - **prompts.js** — Gemma4 prompt templates
 - **server.js** — Express web UI on port 3000
@@ -40,12 +44,23 @@ Pipeline: `scanner.js` → `analyzer.js` → `reporter.js`, orchestrated by `cli
 - `express` — web server
 - `chalk` — CLI colored output
 - `commander` — CLI arg parsing
-- **Ollama** (external, must be running) with `gemma4:latest` model
+- **Ollama** (external, must be running) with `gemma4:latest` model — only for `ollama` backend
 
-## Model
+## Backends & Models
 
-Local Ollama at `http://localhost:11434/api/generate`, model `gemma4:latest`.  
-No API key required. Privacy-safe (runs entirely on device).
+Two Gemma 4 architectures are used where available — 31B dense for per-violation analysis, 26B MoE for deep-reasoning summaries:
+
+| Backend | Analysis model | Summary model | Note |
+|---|---|---|---|
+| `openrouter` | `google/gemma-4-31b-it:free` | `google/gemma-4-31b-it:free` | MoE not available on OpenRouter |
+| `google-ai` | `gemma-4-31b-it` | `gemma-4-26b-a4b-it` | Both available on AI Studio |
+| `ollama` | `gemma4:31b` | `gemma4:26b` | Both architectures available locally |
+
+**Ollama tag notes:** `gemma4:latest` = 4B small model (not mid-level). Use explicit tags.
+- `gemma4:31b` — 30.7B dense, 20GB, 256K context
+- `gemma4:26b` — 25.2B MoE (3.8B active), 18GB, 256K context
+
+Override via env: `OLLAMA_MODEL` (analysis), `SUMMARY_MODEL` (summaries), `GEMMA_BACKEND`.
 
 ## Output Fields Per Violation
 

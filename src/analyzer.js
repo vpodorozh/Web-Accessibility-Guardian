@@ -3,8 +3,11 @@
 const { buildExplanationPrompt, buildCodeFixPrompt } = require('./prompts');
 const ollamaAdapter = require('./adapters/ollama');
 const googleAiAdapter = require('./adapters/google-ai');
+const openrouterAdapter = require('./adapters/openrouter');
 
 const RETRY_DELAY_MS = 3000;
+const RATE_LIMIT_DELAY_MS = 30000;  // 429: wait 30s before retrying
+const INTER_VIOLATION_DELAY_MS = 5000;  // pause between sequential calls to avoid rate limits
 
 const IMPACT_TO_PRIORITY = {
   critical: 'P0 - Fix immediately',
@@ -13,18 +16,37 @@ const IMPACT_TO_PRIORITY = {
   minor: 'P3 - Fix when possible',
 };
 
+// Per-violation analysis: 31B dense — reliable structured output across many sequential calls
+// Summarization: 26B MoE — "advanced reasoning, high-throughput" per Gemma 4 spec; called only
+// twice but needs deep chain-of-thought for the logical audit and persona narrative.
+// Note: OpenRouter only carries the 31B dense for Gemma 4 (MoE unavailable there), so both
+// tasks share the same model on that backend. Ollama has both; use them correctly.
+const DEFAULT_MODEL = {
+  'google-ai': 'gemma-4-31b-it',             // dense 31B — available on AI Studio
+  'openrouter': 'google/gemma-4-31b-it:free', // dense — only Gemma 4 option on OpenRouter
+  'ollama': 'gemma4:31b',                     // dense 31B local (NOT :latest which is 4B)
+};
+
+const DEFAULT_SUMMARY_MODEL = {
+  'google-ai': 'gemma-4-26b-a4b-it',         // MoE — advanced reasoning, available on AI Studio
+  'openrouter': 'google/gemma-4-31b-it:free', // MoE unavailable on OpenRouter, reuse dense
+  'ollama': 'gemma4:26b',                     // MoE local — 25.2B total / 3.8B active, 256K ctx
+};
+
 function resolveConfig(overrides = {}) {
   const backend = overrides.backend || process.env.GEMMA_BACKEND || 'ollama';
   return {
     backend,
     url: overrides.url || process.env.OLLAMA_URL || 'http://localhost:11434/api/generate',
-    model: overrides.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-4-26b-a4b-it' : 'gemma4:latest'),
-    apiKey: overrides.apiKey || process.env.GEMMA_API_KEY || process.env.OLLAMA_API_KEY || null,
+    model: overrides.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL[backend] || 'gemma4:latest',
+    summaryModel: overrides.summaryModel || process.env.SUMMARY_MODEL || DEFAULT_SUMMARY_MODEL[backend] || DEFAULT_MODEL[backend] || 'gemma4:latest',
+    apiKey: overrides.apiKey || process.env.OPENROUTER_API_KEY || process.env.GEMMA_API_KEY || process.env.OLLAMA_API_KEY || null,
   };
 }
 
 function getAdapter(backend) {
   if (backend === 'google-ai') return googleAiAdapter;
+  if (backend === 'openrouter') return openrouterAdapter;
   return ollamaAdapter;
 }
 
@@ -39,6 +61,7 @@ async function analyze(scanResult, onProgress, configOverrides = {}) {
   const enriched = [];
 
   for (let i = 0; i < violations.length; i++) {
+    if (i > 0) await new Promise(r => setTimeout(r, INTER_VIOLATION_DELAY_MS));
     if (onProgress) onProgress(i + 1, violations.length, violations[i].id);
     enriched.push(await enrichViolation(violations[i], config));
   }
@@ -83,7 +106,9 @@ async function enrichViolation(violation, config) {
 }
 
 function parseExplanation(text) {
-  const stripped = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
+  // Strip chain-of-thought reasoning block before parsing JSON
+  const withoutThink = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const stripped = withoutThink.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
   const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error(`No JSON in explanation. Got: ${text.slice(0, 200)}`);
 
@@ -97,6 +122,7 @@ function parseExplanation(text) {
   return {
     summary: String(parsed.summary || ''),
     affectedUsers: String(parsed.affectedUsers || ''),
+    userExperience: String(parsed.userExperience || ''),
     whyItMatters: String(parsed.whyItMatters || ''),
     howToFix: String(parsed.howToFix || ''),
     priority: String(parsed.priority || IMPACT_TO_PRIORITY.moderate),
@@ -134,17 +160,20 @@ function fallbackEnrich(scanResult) {
   };
 }
 
-async function withRetry(fn, retries = 2) {
+async function withRetry(fn, retries = 3) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       if (attempt === retries) throw err;
-      const delay = RETRY_DELAY_MS * (attempt + 1);
+      const isRateLimit = err.message.includes('429');
+      const delay = isRateLimit
+        ? RATE_LIMIT_DELAY_MS * (attempt + 1)
+        : RETRY_DELAY_MS * (attempt + 1);
       process.stderr.write(`   ↻ retrying in ${delay / 1000}s (${err.message.slice(0, 80)})\n`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
 }
 
-module.exports = { analyze, fallbackEnrich };
+module.exports = { analyze, fallbackEnrich, resolveConfig };

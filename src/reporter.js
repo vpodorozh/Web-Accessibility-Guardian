@@ -35,6 +35,50 @@ function reportCLI(result) {
     return lines.join('\n');
   }
 
+  if (result.insights) {
+    const { logical, persona } = result.insights;
+
+    lines.push(`${BOLD}╔══════════════════════════════════════════════════════╗${RESET}`);
+    lines.push(`${BOLD}║              📋  LOGICAL AUDIT SUMMARY               ║${RESET}`);
+    lines.push(`${BOLD}╚══════════════════════════════════════════════════════╝${RESET}`);
+
+    if (logical && !logical.error) {
+      if (logical.headline) lines.push(`\n${BOLD}${logical.headline}${RESET}`);
+      if (logical.verdict) lines.push(`\n${logical.verdict}`);
+      if (logical.areas && logical.areas.length) {
+        lines.push(`\n${BOLD}Areas to fix (in priority order):${RESET}`);
+        const orderedAreas = logical.priorityOrder
+          ? logical.priorityOrder.map(name => logical.areas.find(a => a.area === name) || { area: name })
+          : logical.areas;
+        orderedAreas.forEach((a, i) => {
+          const color = IMPACT_COLORS[a.topImpact] || '';
+          lines.push(`  ${i + 1}. ${color}${BOLD}${a.area}${RESET} — ${a.note || ''} (${a.issueCount || '?'} issue(s))`);
+        });
+      }
+    } else {
+      lines.push(`${DIM}Logical summary unavailable: ${logical?.error || 'unknown error'}${RESET}`);
+    }
+
+    lines.push('');
+    lines.push(`${BOLD}╔══════════════════════════════════════════════════════╗${RESET}`);
+    lines.push(`${BOLD}║          🧑‍🦯  IN THE SHOES OF A DISABLED USER         ║${RESET}`);
+    lines.push(`${BOLD}╚══════════════════════════════════════════════════════╝${RESET}`);
+
+    if (persona && !persona.error) {
+      if (persona.disability) lines.push(`\n${BOLD}Perspective:${RESET} ${persona.disability}`);
+      if (persona.task) lines.push(`${BOLD}Goal:${RESET} ${persona.task}`);
+      if (persona.experience) lines.push(`\n${persona.experience}`);
+      if (persona.breakingPoint) lines.push(`\n${BOLD}Breaking point:${RESET} ${persona.breakingPoint}`);
+      if (persona.impact) lines.push(`${BOLD}Real-world impact:${RESET} ${persona.impact}`);
+    } else {
+      lines.push(`${DIM}Persona summary unavailable: ${persona?.error || 'unknown error'}${RESET}`);
+    }
+
+    lines.push('');
+    lines.push('═'.repeat(56));
+    lines.push('');
+  }
+
   const byImpact = groupByImpact(result.violations);
   const order = ['critical', 'serious', 'moderate', 'minor'];
 
@@ -53,6 +97,10 @@ function reportCLI(result) {
       lines.push(`${DIM}${wcag}Affects ${v.nodeCount} element(s)${RESET}`);
       lines.push('');
       if (v.affectedUsers) lines.push(`${BOLD}👥 Who is affected:${RESET} ${v.affectedUsers}`);
+      if (v.userExperience) {
+        lines.push(`${BOLD}🧑‍🦯 User experience:${RESET}`);
+        lines.push(`   ${CYAN}${v.userExperience.replace(/\n/g, '\n   ')}${RESET}`);
+      }
       if (v.whyItMatters) lines.push(`${BOLD}⚠️  Why it matters:${RESET}  ${v.whyItMatters}`);
       if (v.howToFix) {
         lines.push(`${BOLD}🔧 How to fix:${RESET}`);
@@ -141,6 +189,29 @@ function reportHTML(result) {
   details summary { list-style: none; }
   details summary::-webkit-details-marker { display: none; }
   footer { margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #999; }
+  .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+  @media (max-width: 640px) { .insights { grid-template-columns: 1fr; } }
+  .insight-card { background: white; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .insight-card h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+  .insight-headline { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+  .insight-verdict { font-size: 0.875rem; line-height: 1.6; color: #374151; }
+  .insight-areas { margin: 0.75rem 0 0; padding: 0; list-style: none; }
+  .insight-areas li { font-size: 0.8rem; padding: 0.3rem 0; border-top: 1px solid #f0f0f0; display: flex; align-items: baseline; gap: 0.4rem; }
+  .insight-areas li:first-child { border-top: none; }
+  .area-rank { font-weight: 700; color: #666; min-width: 1.2rem; }
+  .area-name { font-weight: 600; }
+  .area-note { color: #555; flex: 1; }
+  .area-count { font-size: 0.75rem; color: #999; white-space: nowrap; }
+  .area-critical { color: #dc2626; }
+  .area-serious { color: #ea580c; }
+  .area-moderate { color: #ca8a04; }
+  .area-minor { color: #2563eb; }
+  .persona-meta { font-size: 0.8rem; color: #555; margin-bottom: 0.75rem; }
+  .persona-experience { font-size: 0.875rem; line-height: 1.7; color: #374151; font-style: italic; border-left: 3px solid #e5e7eb; padding-left: 0.75rem; margin: 0.75rem 0; }
+  .persona-breaking { font-size: 0.8rem; background: #fef2f2; border-left: 3px solid #f87171; padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; margin-top: 0.75rem; }
+  .persona-impact { font-size: 0.8rem; color: #374151; margin-top: 0.5rem; }
+  .insight-error { font-size: 0.85rem; color: #9a3412; background: #fff7ed; padding: 0.5rem 0.75rem; border-radius: 4px; }
+  .user-experience { background: #f5f3ff; border-left: 3px solid #7c3aed; border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; font-size: 0.875rem; line-height: 1.65; color: #3b0764; font-style: italic; margin-top: 0.35rem; }
 </style>
 </head>
 <body>
@@ -169,6 +240,8 @@ ${violations.length > 0 && violations.every(v => !v.aiEnriched) ? `<div class="a
   <div class="stat minor"><div class="stat-number">${minorCount}</div><div class="stat-label">Minor</div></div>
   <div class="stat passed"><div class="stat-number">${result.passCount}</div><div class="stat-label">Passed</div></div>
 </div>
+
+${result.insights ? renderInsights(result.insights) : ''}
 
 ${
   result.violationCount === 0
@@ -217,6 +290,11 @@ function renderViolationCard(v) {
       <div class="section-label">👥 Who is affected</div>
       <div class="section-content">${escapeHtml(v.affectedUsers || '')}</div>
     </div>
+    ${v.userExperience ? `
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">${escapeHtml(v.userExperience)}</div>
+    </div>` : ''}
     <div class="section">
       <div class="section-label">⚠️ Why it matters</div>
       <div class="section-content">${escapeHtml(v.whyItMatters || '')}</div>
@@ -231,6 +309,51 @@ function renderViolationCard(v) {
       ${v.wcagCriteria.length ? `&nbsp;<a class="wcag-link" href="${escapeHtml(v.helpUrl)}" target="_blank" rel="noopener">WCAG ${v.wcagCriteria.join(', ')} ↗</a>` : ''}
       <span style="float:right;font-size:0.8rem;color:#999">${v.nodeCount} element(s) affected</span>
     </div>
+  </div>
+</div>`;
+}
+
+function renderInsights({ logical, persona }) {
+  const logicalHtml = logical && !logical.error
+    ? `
+      <div class="insight-headline">${escapeHtml(logical.headline || '')}</div>
+      <div class="insight-verdict">${escapeHtml(logical.verdict || '')}</div>
+      ${logical.areas && logical.areas.length ? `
+        <ul class="insight-areas">
+          ${(logical.priorityOrder
+            ? logical.priorityOrder.map(name => logical.areas.find(a => a.area === name) || { area: name })
+            : logical.areas
+          ).map((a, i) => `
+            <li>
+              <span class="area-rank">${i + 1}.</span>
+              <span class="area-name area-${escapeHtml(a.topImpact || 'minor')}">${escapeHtml(a.area || '')}</span>
+              <span class="area-note">${escapeHtml(a.note || '')}</span>
+              <span class="area-count">${a.issueCount != null ? a.issueCount + ' issue(s)' : ''}</span>
+            </li>`).join('')}
+        </ul>` : ''}
+    `
+    : `<div class="insight-error">Summary unavailable: ${escapeHtml(logical?.error || 'unknown error')}</div>`;
+
+  const personaHtml = persona && !persona.error
+    ? `
+      <div class="persona-meta">
+        <strong>Perspective:</strong> ${escapeHtml(persona.disability || '')}<br>
+        <strong>Goal:</strong> ${escapeHtml(persona.task || '')}
+      </div>
+      <div class="persona-experience">${escapeHtml(persona.experience || '')}</div>
+      ${persona.breakingPoint ? `<div class="persona-breaking">⛔ ${escapeHtml(persona.breakingPoint)}</div>` : ''}
+      ${persona.impact ? `<div class="persona-impact">💬 ${escapeHtml(persona.impact)}</div>` : ''}
+    `
+    : `<div class="insight-error">Persona summary unavailable: ${escapeHtml(persona?.error || 'unknown error')}</div>`;
+
+  return `<div class="insights">
+  <div class="insight-card">
+    <h2>📋 Logical Audit Summary</h2>
+    ${logicalHtml}
+  </div>
+  <div class="insight-card">
+    <h2>🧑‍🦯 In the Shoes of a Disabled User</h2>
+    ${personaHtml}
   </div>
 </div>`;
 }
