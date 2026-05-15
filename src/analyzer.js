@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildViolationPrompt } = require('./prompts');
+const { buildExplanationPrompt, buildCodeFixPrompt } = require('./prompts');
 const ollamaAdapter = require('./adapters/ollama');
 const googleAiAdapter = require('./adapters/google-ai');
 
@@ -53,12 +53,13 @@ async function analyze(scanResult, onProgress, configOverrides = {}) {
 }
 
 async function enrichViolation(violation, config) {
+  const adapter = getAdapter(config.backend);
+
+  // Call 1: text explanation (clean JSON, no code)
+  let explanation;
   try {
-    const prompt = buildViolationPrompt(violation);
-    const adapter = getAdapter(config.backend);
-    const text = await adapter.generate(prompt, config);
-    const parsed = parseGemmaResponse(text);
-    return { ...violation, ...parsed, aiEnriched: true, aiBackend: config.backend };
+    const text = await adapter.generate(buildExplanationPrompt(violation), config);
+    explanation = parseExplanation(text);
   } catch (err) {
     return {
       ...violation,
@@ -74,20 +75,29 @@ async function enrichViolation(violation, config) {
       aiError: err.message,
     };
   }
+
+  // Call 2: code fix (plain text, no JSON) — optional, degrades gracefully
+  let codeExample = { before: violation.nodes[0]?.html || '', after: '' };
+  try {
+    const text = await adapter.generate(buildCodeFixPrompt(violation), config);
+    codeExample = parseCodeFix(text);
+  } catch {
+    // non-fatal: keep raw HTML as before, leave after empty
+  }
+
+  return { ...violation, ...explanation, codeExample, aiEnriched: true, aiBackend: config.backend };
 }
 
-function parseGemmaResponse(text) {
-  // Strip markdown code fences if present (```json ... ```)
+function parseExplanation(text) {
   const stripped = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
-
   const jsonMatch = stripped.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error(`No JSON found in response. Got: ${text.slice(0, 200)}`);
+  if (!jsonMatch) throw new Error(`No JSON in explanation. Got: ${text.slice(0, 200)}`);
 
   let parsed;
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch (e) {
-    throw new Error(`JSON parse failed: ${e.message}. Input: ${jsonMatch[0].slice(0, 200)}`);
+    throw new Error(`Explanation JSON parse failed: ${e.message}. Input: ${jsonMatch[0].slice(0, 200)}`);
   }
 
   return {
@@ -95,11 +105,20 @@ function parseGemmaResponse(text) {
     affectedUsers: String(parsed.affectedUsers || ''),
     whyItMatters: String(parsed.whyItMatters || ''),
     howToFix: String(parsed.howToFix || ''),
-    codeExample: {
-      before: String(parsed.codeExample?.before || ''),
-      after: String(parsed.codeExample?.after || ''),
-    },
     priority: String(parsed.priority || IMPACT_TO_PRIORITY.moderate),
+  };
+}
+
+function parseCodeFix(text) {
+  // Expect: "BEFORE:\n<code>\nAFTER:\n<code>"
+  const beforeMatch = text.match(/BEFORE:\s*\n([\s\S]*?)(?=AFTER:|$)/i);
+  const afterMatch = text.match(/AFTER:\s*\n([\s\S]*)/i);
+
+  const strip = (s) => s ? s.trim().replace(/^```[\w]*\n?/m, '').replace(/\n?```$/m, '').trim() : '';
+
+  return {
+    before: strip(beforeMatch?.[1] || ''),
+    after: strip(afterMatch?.[1] || ''),
   };
 }
 

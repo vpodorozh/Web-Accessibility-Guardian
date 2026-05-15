@@ -1,32 +1,39 @@
 'use strict';
 
-function buildViolationPrompt(violation) {
-  const exampleNode = violation.nodes[0];
-  const nodeHtml = exampleNode ? exampleNode.html.slice(0, 300) : 'N/A';
+function buildExplanationPrompt(violation) {
   const wcag = violation.wcagCriteria.length > 0 ? violation.wcagCriteria.join(', ') : 'best-practice';
 
-  return `You are an accessibility expert. Output ONLY a JSON object. No preamble, no explanation, no markdown fences. Start your response with { and end with }.
+  return `You are an accessibility expert. Output ONLY a JSON object. Start with { and end with }. No preamble, no markdown.
 
-Input:
-- id: ${violation.id}
-- impact: ${violation.impact}
-- description: ${violation.description}
-- wcag: ${wcag}
-- html: ${nodeHtml}
-- affected elements: ${violation.nodeCount}
+Violation: ${violation.id} (${violation.impact})
+Description: ${violation.description}
+WCAG: ${wcag}
+Affected elements: ${violation.nodeCount}
 
-Required JSON:
+Return this JSON (string values only, no nested objects, no code):
 {
   "summary": "1-2 sentence plain-language description of the problem",
-  "affectedUsers": "specific groups impacted, e.g. screen reader users, keyboard-only users, people with low vision",
+  "affectedUsers": "specific groups impacted e.g. screen reader users, keyboard-only users",
   "whyItMatters": "why this matters practically and legally, referencing the WCAG criterion",
   "howToFix": "step-by-step plain English instructions to fix this",
-  "codeExample": {
-    "before": "the problematic code",
-    "after": "the corrected code with a comment explaining the fix"
-  },
   "priority": "one of: P0 - Fix immediately, P1 - Fix this sprint, P2 - Fix soon, P3 - Fix when possible"
 }`;
 }
 
-module.exports = { buildViolationPrompt };
+function buildCodeFixPrompt(violation) {
+  const exampleNode = violation.nodes[0];
+  const nodeHtml = exampleNode ? exampleNode.html.slice(0, 400) : 'N/A';
+
+  return `You are an accessibility expert. Show a before/after code fix for this violation.
+
+Violation: ${violation.id}
+Affected HTML: ${nodeHtml}
+
+Reply in this exact format (no JSON, no markdown, just these two labeled blocks):
+BEFORE:
+<paste the problematic code here>
+AFTER:
+<paste the corrected code here with a short inline comment>`;
+}
+
+module.exports = { buildExplanationPrompt, buildCodeFixPrompt };
