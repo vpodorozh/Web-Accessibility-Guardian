@@ -142,6 +142,16 @@ function reportHTML(result) {
 </style>
 </head>
 <body>
+<script type="application/json" id="scan-meta">${JSON.stringify({
+  url: result.url,
+  scannedAt: result.scannedAt,
+  violationCount: result.violationCount,
+  passCount: result.passCount,
+  critical: criticalCount,
+  serious: seriousCount,
+  moderate: moderateCount,
+  minor: minorCount,
+})}</script>
 <h1>♿ Accessibility Guardian Report</h1>
 <p class="meta">
   URL: <a href="${escapeHtml(result.url)}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a><br>

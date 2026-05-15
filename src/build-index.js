@@ -109,12 +109,10 @@ function badge(count) {
 function extractMeta(reportPath) {
   try {
     const html = fs.readFileSync(reportPath, 'utf8');
-    const urlMatch = html.match(/href="([^"]+)" target="_blank" rel="noopener">\1<\/a>/);
-    const violationsMatch = html.match(/Violations:<\/div>\s*<div[^>]*>(\d+)/);
-    return {
-      url: urlMatch ? urlMatch[1] : null,
-      violations: violationsMatch ? parseInt(violationsMatch[1]) : null,
-    };
+    const match = html.match(/<script type="application\/json" id="scan-meta">([^<]+)<\/script>/);
+    if (!match) return { url: null, violations: null };
+    const meta = JSON.parse(match[1]);
+    return { url: meta.url, violations: meta.violationCount };
   } catch {
     return { url: null, violations: null };
   }
