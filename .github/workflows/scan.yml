@@ -17,9 +17,17 @@ on:
         default: 'gemma-4-31b-it'
         type: string
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -38,17 +46,26 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run accessibility scan
-        run: node src/cli.js --url "$SCAN_URL" --backend google-ai --model "$SCAN_MODEL" --api-key "$SCAN_API_KEY" --format html --output report.html
+        run: node src/cli.js --url "$SCAN_URL" --backend google-ai --model "$SCAN_MODEL" --api-key "$SCAN_API_KEY" --format html --output _site/index.html
         env:
           SCAN_URL: ${{ inputs.url }}
           SCAN_MODEL: ${{ inputs.model }}
           SCAN_API_KEY: ${{ inputs.api_key || secrets.GEMMA_API_KEY }}
           GEMMA_BACKEND: google-ai
 
-      - name: Upload report
+      - name: Upload report as artifact (zip download)
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: accessibility-report-${{ github.run_number }}
-          path: report.html
+          path: _site/index.html
           retention-days: 30
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
