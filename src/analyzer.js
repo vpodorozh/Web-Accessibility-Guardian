@@ -5,9 +5,9 @@ const ollamaAdapter = require('./adapters/ollama');
 const googleAiAdapter = require('./adapters/google-ai');
 const openrouterAdapter = require('./adapters/openrouter');
 
-const RETRY_DELAY_MS = 3000;
-const RATE_LIMIT_DELAY_MS = 30000;  // 429: wait 30s before retrying
-const INTER_VIOLATION_DELAY_MS = 5000;  // pause between sequential calls to avoid rate limits
+const RETRY_DELAY_MS = 15000;
+const RATE_LIMIT_DELAY_MS = 60000;  // 429: wait 60s before retrying
+const INTER_VIOLATION_DELAY_MS = 8000;  // pause between sequential calls to avoid rate limits
 
 const IMPACT_TO_PRIORITY = {
   critical: 'P0 - Fix immediately',

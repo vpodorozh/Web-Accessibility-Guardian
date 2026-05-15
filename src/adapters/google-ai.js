@@ -15,7 +15,7 @@ async function generate(prompt, config) {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
     }),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(360000),
   });
 
   if (!response.ok) {
