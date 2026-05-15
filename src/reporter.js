@@ -133,7 +133,9 @@ function reportHTML(result) {
   .wcag-link { font-size: 0.8rem; color: #4a90e2; text-decoration: none; }
   .wcag-link:hover { text-decoration: underline; }
   .ai-badge { display: inline-block; font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 4px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; margin-left: 0.5rem; }
+  .ai-badge-error { background: #fff7ed; color: #c2410c; border-color: #fed7aa; cursor: help; }
   .congrats { background: #f0fdf4; border: 2px solid #4ade80; border-radius: 8px; padding: 2rem; text-align: center; color: #166534; }
+  .ai-warning { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: #9a3412; }
   .toggle-icon { transition: transform 0.2s; }
   .card.open .toggle-icon { transform: rotate(180deg); }
   details summary { list-style: none; }
@@ -157,6 +159,8 @@ function reportHTML(result) {
   URL: <a href="${escapeHtml(result.url)}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a><br>
   Scanned: ${escapeHtml(result.scannedAt)} · Powered by Playwright + axe-core + Gemma4
 </p>
+
+${violations.length > 0 && violations.every(v => !v.aiEnriched) ? `<div class="ai-warning">⚠️ <strong>AI analysis unavailable</strong> — showing raw axe-core data. First error: <code>${escapeHtml(violations[0]?.aiError || 'unknown')}</code><br>Check that <code>GEMMA_API_KEY</code> is set correctly in your GitHub repository secrets.</div>` : ''}
 
 <div class="stats">
   <div class="stat critical"><div class="stat-number">${criticalCount}</div><div class="stat-label">Critical</div></div>
@@ -191,7 +195,9 @@ document.querySelectorAll('.card-header').forEach(h => {
 }
 
 function renderViolationCard(v) {
-  const aiTag = v.aiEnriched ? '<span class="ai-badge">✨ Gemma4</span>' : '';
+  const aiTag = v.aiEnriched
+    ? '<span class="ai-badge">✨ Gemma4</span>'
+    : `<span class="ai-badge ai-badge-error" title="${escapeHtml(v.aiError || 'AI unavailable')}">⚠ raw data</span>`;
   const beforeCode = v.codeExample?.before
     ? `<div class="code-before"><div class="code-label">Before</div><div class="code-block">${escapeHtml(v.codeExample.before)}</div></div>`
     : '';

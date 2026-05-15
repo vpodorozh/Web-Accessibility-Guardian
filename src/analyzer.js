@@ -77,10 +77,18 @@ async function enrichViolation(violation, config) {
 }
 
 function parseGemmaResponse(text) {
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON found in response');
+  // Strip markdown code fences if present (```json ... ```)
+  const stripped = text.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error(`No JSON found in response. Got: ${text.slice(0, 200)}`);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    throw new Error(`JSON parse failed: ${e.message}. Input: ${jsonMatch[0].slice(0, 200)}`);
+  }
 
   return {
     summary: String(parsed.summary || ''),
