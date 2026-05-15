@@ -54,6 +54,52 @@ For each violation, Gemma4 generates:
 
 ---
 
+## Gemma 4 Model Selection — Why These Models, Why This Split
+
+Accessibility Guardian intentionally uses **two different Gemma 4 architectures** for two different tasks. This is not arbitrary — each architecture's characteristics map directly to what the task demands.
+
+### The Two-Model Strategy
+
+| Task | Model | Architecture | Calls per scan |
+|---|---|---|---|
+| Per-violation analysis | `gemma-4-31b-it` (hosted) / `gemma4:31b` (local) | **31B Dense** | N (once per violation) |
+| Audit triage + persona narrative summaries | `gemma-4-26b-a4b-it` (hosted) / `gemma4:26b` (local) | **26B MoE (Mixture-of-Experts)** | 2 (once per scan) |
+
+### Why 31B Dense for Per-Violation Analysis
+
+Each violation is analysed individually in a sequential loop — a page with 15 violations triggers 15 AI calls. At this scale, **consistency and reliability are paramount**:
+
+- The dense architecture activates all parameters for every token, producing stable, predictable outputs call after call.
+- The response must be **valid, parseable JSON** with six specific fields (`summary`, `affectedUsers`, `whyItMatters`, `howToFix`, `codeExample`, `priority`). A single malformed response breaks the report. Dense transformers are significantly more reliable for strict structured output than sparse alternatives.
+- Each prompt is self-contained (one violation, no cross-violation context needed), so the broad but consistent knowledge of a dense model is exactly right.
+
+In short: many calls, structured output, predictability over everything — **dense wins**.
+
+### Why 26B MoE for Audit Summaries
+
+The two scan-level summaries are a fundamentally different problem:
+
+1. **Logical audit triage** — synthesises all violations into a prioritised remediation plan
+2. **"Get in the shoes" persona narrative** — constructs a first-person experience of a disabled user navigating the page
+
+Both require **deep cross-violation reasoning**: the model must hold the full violation set in context, identify patterns, weigh priorities, and produce a coherent narrative. For this, Accessibility Guardian uses `<think>` chain-of-thought prompting, explicitly instructing the model to reason step-by-step before forming its answer.
+
+Gemma 4's 26B MoE architecture is "designed for high-throughput, advanced reasoning" (Google Gemma 4 release notes). Its **Mixture-of-Experts design selectively activates specialist sub-networks** per token — exactly the right property for multi-step synthesis where different parts of the reasoning chain draw on different competencies (WCAG knowledge, empathy framing, technical prioritisation). MoE's efficiency also means the model can sustain long chain-of-thought sequences without degradation.
+
+In short: called twice, with complex reasoning prompts and `<think>` blocks, needing synthesis across many inputs — **MoE wins**.
+
+### Backend Availability
+
+| Backend | Per-violation model | Summary model |
+|---|---|---|
+| **Google AI Studio** | `gemma-4-31b-it` (Dense) | `gemma-4-26b-a4b-it` (MoE) |
+| **Ollama (local)** | `gemma4:31b` (Dense) | `gemma4:26b` (MoE) |
+| **OpenRouter (free)** | `google/gemma-4-31b-it:free` (Dense) | `google/gemma-4-31b-it:free` (Dense — MoE not yet available free) |
+
+On OpenRouter the 31B dense model handles both roles — it degrades gracefully for the summary tasks, though the MoE's chain-of-thought depth is the preferred path on backends that support it.
+
+---
+
 ## Installation
 
 **Prerequisites:**
