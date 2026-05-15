@@ -74,6 +74,9 @@ jobs:
           OPENROUTER_API_KEY: ${{ inputs.api_key || secrets.OPENROUTER_API_KEY }}
           GEMMA_API_KEY: ${{ inputs.api_key || secrets.GEMMA_API_KEY }}
 
+      - name: Inject example report
+        run: mkdir -p _site/reports/example && cp example-report/index.html _site/reports/example/index.html
+
       - name: Prune old reports and build index
         run: node src/build-index.js _site
 

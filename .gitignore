@@ -3,5 +3,6 @@ node_modules/
 reports/
 *.html
 !public/index.html
+!example-report/index.html
 .env
 .DS_Store

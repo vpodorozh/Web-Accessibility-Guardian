@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accessibility Guardian Report — https://dev.to/</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem 1rem; color: #1a1a1a; background: #f8f9fa; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+  .meta { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+  .meta a { color: #4a90e2; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat { background: white; border-radius: 8px; padding: 1rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .stat-number { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 0.8rem; color: #666; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: .05em; }
+  .critical .stat-number { color: #dc2626; }
+  .serious .stat-number { color: #ea580c; }
+  .moderate .stat-number { color: #ca8a04; }
+  .minor .stat-number { color: #2563eb; }
+  .passed .stat-number { color: #16a34a; }
+  .card { background: white; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); overflow: hidden; }
+  .card-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; }
+  .card-header:hover { background: #f9f9f9; }
+  .badge { display: inline-block; padding: 0.2em 0.6em; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .badge-critical { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+  .badge-serious { background: #fff7ed; color: #ea580c; border: 1px solid #fdba74; }
+  .badge-moderate { background: #fefce8; color: #ca8a04; border: 1px solid #fde047; }
+  .badge-minor { background: #eff6ff; color: #2563eb; border: 1px solid #93c5fd; }
+  .card-title { font-weight: 600; flex: 1; }
+  .card-id { font-family: monospace; font-size: 0.8rem; color: #666; }
+  .card-body { padding: 0 1.25rem 1.25rem; border-top: 1px solid #f0f0f0; }
+  .section { margin-top: 1rem; }
+  .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #666; margin-bottom: 0.35rem; }
+  .section-content { font-size: 0.9rem; line-height: 1.6; }
+  .code-block { background: #1e1e1e; color: #d4d4d4; border-radius: 6px; padding: 0.75rem 1rem; font-family: 'Courier New', monospace; font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .code-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 0.25rem; }
+  .code-before .code-label { color: #f87171; }
+  .code-after .code-label { color: #4ade80; }
+  .code-before .code-block { border-left: 3px solid #f87171; }
+  .code-after .code-block { border-left: 3px solid #4ade80; }
+  .priority { display: inline-block; margin-top: 0.75rem; padding: 0.3em 0.75em; border-radius: 999px; font-size: 0.8rem; font-weight: 600; background: #f0f0f0; }
+  .wcag-link { font-size: 0.8rem; color: #4a90e2; text-decoration: none; }
+  .wcag-link:hover { text-decoration: underline; }
+  .ai-badge { display: inline-block; font-size: 0.7rem; padding: 0.15em 0.5em; border-radius: 4px; background: #f0fdf4; color: #15803d; border: 1px solid #86efac; margin-left: 0.5rem; }
+  .ai-badge-error { background: #fff7ed; color: #c2410c; border-color: #fed7aa; cursor: help; }
+  .congrats { background: #f0fdf4; border: 2px solid #4ade80; border-radius: 8px; padding: 2rem; text-align: center; color: #166534; }
+  .ai-warning { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.85rem; color: #9a3412; }
+  .toggle-icon { transition: transform 0.2s; }
+  .card.open .toggle-icon { transform: rotate(180deg); }
+  details summary { list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+  footer { margin-top: 3rem; text-align: center; font-size: 0.8rem; color: #999; }
+  .insights { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+  @media (max-width: 640px) { .insights { grid-template-columns: 1fr; } }
+  .insight-card { background: white; border-radius: 8px; padding: 1.25rem 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .insight-card h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+  .insight-headline { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+  .insight-verdict { font-size: 0.875rem; line-height: 1.6; color: #374151; }
+  .insight-areas { margin: 0.75rem 0 0; padding: 0; list-style: none; }
+  .insight-areas li { font-size: 0.8rem; padding: 0.3rem 0; border-top: 1px solid #f0f0f0; display: flex; align-items: baseline; gap: 0.4rem; }
+  .insight-areas li:first-child { border-top: none; }
+  .area-rank { font-weight: 700; color: #666; min-width: 1.2rem; }
+  .area-name { font-weight: 600; }
+  .area-note { color: #555; flex: 1; }
+  .area-count { font-size: 0.75rem; color: #999; white-space: nowrap; }
+  .area-critical { color: #dc2626; }
+  .area-serious { color: #ea580c; }
+  .area-moderate { color: #ca8a04; }
+  .area-minor { color: #2563eb; }
+  .persona-meta { font-size: 0.8rem; color: #555; margin-bottom: 0.75rem; }
+  .persona-experience { font-size: 0.875rem; line-height: 1.7; color: #374151; font-style: italic; border-left: 3px solid #e5e7eb; padding-left: 0.75rem; margin: 0.75rem 0; }
+  .persona-breaking { font-size: 0.8rem; background: #fef2f2; border-left: 3px solid #f87171; padding: 0.5rem 0.75rem; border-radius: 0 4px 4px 0; margin-top: 0.75rem; }
+  .persona-impact { font-size: 0.8rem; color: #374151; margin-top: 0.5rem; }
+  .insight-error { font-size: 0.85rem; color: #9a3412; background: #fff7ed; padding: 0.5rem 0.75rem; border-radius: 4px; }
+  .user-experience { background: #f5f3ff; border-left: 3px solid #7c3aed; border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; font-size: 0.875rem; line-height: 1.65; color: #3b0764; font-style: italic; margin-top: 0.35rem; }
+</style>
+</head>
+<body>
+<script type="application/json" id="scan-meta">{"url":"https://dev.to/","scannedAt":"2026-05-15T16:01:02.900Z","violationCount":6,"passCount":48,"critical":2,"serious":3,"moderate":1,"minor":0}</script>
+<h1>♿ Accessibility Guardian Report</h1>
+<p class="meta">
+  URL: <a href="https://dev.to/" target="_blank" rel="noopener">https://dev.to/</a><br>
+  Scanned: 2026-05-15T16:01:02.900Z · Powered by Playwright + axe-core + Gemma4
+</p>
+
+
+
+<div class="stats">
+  <div class="stat critical"><div class="stat-number">2</div><div class="stat-label">Critical</div></div>
+  <div class="stat serious"><div class="stat-number">3</div><div class="stat-label">Serious</div></div>
+  <div class="stat moderate"><div class="stat-number">1</div><div class="stat-label">Moderate</div></div>
+  <div class="stat minor"><div class="stat-number">0</div><div class="stat-label">Minor</div></div>
+  <div class="stat passed"><div class="stat-number">48</div><div class="stat-label">Passed</div></div>
+</div>
+
+<div class="insights">
+  <div class="insight-card">
+    <h2>📋 Logical Audit Summary</h2>
+    
+      <div class="insight-headline">Widespread missing alternative text for images and broken interactive control semantics create significant barriers for screen reader users.</div>
+      <div class="insight-verdict">The site presents a high accessibility risk due to systemic failures in image descriptions and broken interactive control semantics. Developers should prioritize resolving the image-alt and aria-valid-attr-value violations to restore basic usability for non-visual users.</div>
+      
+        <ul class="insight-areas">
+          
+            <li>
+              <span class="area-rank">1.</span>
+              <span class="area-name area-critical">Images</span>
+              <span class="area-note">Massive volume of images missing alternative text, preventing visual content description.</span>
+              <span class="area-count">52 issue(s)</span>
+            </li>
+            <li>
+              <span class="area-rank">2.</span>
+              <span class="area-name area-critical">Interactive Controls</span>
+              <span class="area-note">Broken ARIA attributes, empty links, and invalid nested interactive elements.</span>
+              <span class="area-count">7 issue(s)</span>
+            </li>
+            <li>
+              <span class="area-rank">3.</span>
+              <span class="area-name area-serious">Content &amp; Readability</span>
+              <span class="area-note">Insufficient color contrast and non-sequential heading levels.</span>
+              <span class="area-count">4 issue(s)</span>
+            </li>
+        </ul>
+    
+  </div>
+  <div class="insight-card">
+    <h2>🧑‍🦯 In the Shoes of a Disabled User</h2>
+    
+      <div class="persona-meta">
+        <strong>Perspective:</strong> Blindness using NVDA 2024 on Windows 11 with Chrome<br>
+        <strong>Goal:</strong> Find and read a recent article about web development
+      </div>
+      <div class="persona-experience">I land on the homepage and immediately feel lost because the images that should provide context are just silent voids. As I tab through the navigation, I keep hitting links that have no names, so NVDA just says &#039;link&#039; without telling me where they lead. I try to use heading navigation to find the main content, but the structure feels broken and jumps around unpredictably. When a promotional popup appears, I try to find the close button, but the screen reader announces an invalid attribute instead of telling me it&#039;s a button to exit. I am left clicking blindly, unable to tell if I am interacting with a button or a link.</div>
+      <div class="persona-breaking">⛔ I am trapped inside a popup window because the close button provides no usable information, and I cannot navigate back to the article feed.</div>
+      <div class="persona-impact">💬 This technical failure turns a simple search for information into a frustrating struggle for basic digital agency.</div>
+    
+  </div>
+</div>
+
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-critical">critical</span>
+    <span class="card-title">An ARIA attribute on the close button contains an invalid value, which prevents assistive technologies from correctly communicating the element&#039;s purpose or state to the user.<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">aria-valid-attr-value</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Screen reader users (such as those using NVDA, JAWS, or VoiceOver) who rely on ARIA attributes to understand the relationship between a trigger and the content it controls.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I tab to the close button for the sponsorship banner, but my screen reader doesn&#039;t tell me that this button controls a specific section of the page because the attribute value is invalid. I&#039;m left guessing what will happen when I click it, and I lose the programmatic connection between the button and the banner it is supposed to close.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">This is a violation of WCAG 4.1.2 (Name, Role, Value), which requires that the state and role of UI controls be programmatically determinable. Legally, this failure can make a site non-compliant with ADA and Section 508 standards, as it creates a barrier for users with visual impairments.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">1. Identify the ARIA attribute on the button that has the invalid value. 2. Consult the WAI-ARIA specification to find the list of accepted values for that specific attribute. 3. Replace the invalid value with a valid one (for example, ensuring boolean attributes use &#039;true&#039; or &#039;false&#039; instead of &#039;yes&#039; or &#039;no&#039;).</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;button id=&quot;sponsorship-close-trigger-261441&quot; aria-controls=&quot;sponsorship-close-261441&quot; class=&quot;crayons-btn crayons-btn--s crayons-btn--ghost crayons-btn--icon&quot;&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;button id=&quot;sponsorship-close-trigger-261441&quot; aria-label=&quot;Close&quot; aria-controls=&quot;sponsorship-close-261441&quot; class=&quot;crayons-btn crayons-btn--s crayons-btn--ghost crayons-btn--icon&quot;&gt; &lt;!-- Added aria-label to provide an accessible name for the icon button --&gt;</div></div></div>
+    <div>
+      <span class="priority">P1 - Fix this sprint</span>
+      &nbsp;<a class="wcag-link" href="https://dequeuniversity.com/rules/axe/4.11/aria-valid-attr-value?application=playwright" target="_blank" rel="noopener">WCAG 2a, 4.12 ↗</a>
+      <span style="float:right;font-size:0.8rem;color:#999">1 element(s) affected</span>
+    </div>
+  </div>
+</div>
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-critical">critical</span>
+    <span class="card-title">52 images are missing alternative text, which prevents screen readers from describing the visual content to users who cannot see the screen.<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">image-alt</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Blind and low-vision users relying on screen readers (such as NVDA, JAWS, or VoiceOver) are blocked because they receive no meaningful information about the images.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I am navigating the page with my screen reader when I suddenly hear a long, nonsensical string of characters like &#039;exploding-head-daceb38d627e6ae9b730f36a1e390fca556a4289d5a41abb2c35068ad3e2c4b5 dot svg&#039;. I have no way of knowing if this image is a critical alert icon, a navigation button, or just a decorative graphic, which leaves me confused and disconnected from the content.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">This is a violation of WCAG 1.1.1 (Non-text Content), a Level A requirement. Failing to provide alt text is a fundamental accessibility barrier and poses a high legal risk under the ADA and EAA.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">For each image, determine its purpose. If the image conveys information, add a descriptive alt attribute (e.g., alt=&#039;Warning icon&#039;). If the image is purely decorative, add an empty alt attribute (alt=&#039;&#039;) or role=&#039;presentation&#039; so screen readers know to skip it.</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;img src=&quot;https://assets.dev.to/assets/exploding-head-daceb38d627e6ae9b730f36a1e390fca556a4289d5a41abb2c35068ad3e2c4b5.svg&quot; width=&quot;18&quot; height=&quot;18&quot;&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;img src=&quot;https://assets.dev.to/assets/exploding-head-daceb38d627e6ae9b730f36a1e390fca556a4289d5a41abb2c35068ad3e2c4b5.svg&quot; width=&quot;18&quot; height=&quot;18&quot; alt=&quot;Exploding head&quot;&gt; &lt;!-- Added descriptive alt text for accessibility --&gt;</div></div></div>
+    <div>
+      <span class="priority">P0 - Fix immediately</span>
+      &nbsp;<a class="wcag-link" href="https://dequeuniversity.com/rules/axe/4.11/image-alt?application=playwright" target="_blank" rel="noopener">WCAG 2a, 1.11 ↗</a>
+      <span style="float:right;font-size:0.8rem;color:#999">52 element(s) affected</span>
+    </div>
+  </div>
+</div>
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-serious">serious</span>
+    <span class="card-title">The text and links have insufficient color contrast against their background, making the content difficult or impossible to read for many users.<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">color-contrast</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Users with low vision, color blindness, or age-related vision loss. These users cannot distinguish the text from the background, which renders the information invisible or illegible.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I try to read the site description, but the &#039;DEV Community&#039; link is so faint it almost blends into the background. I find myself squinting and leaning closer to the screen, but I still can&#039;t clearly see where the link ends and the text begins, making me feel like I&#039;m missing a key piece of navigation.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">This is a violation of WCAG 2.1 Success Criterion 1.4.3 (Contrast Minimum). Practically, it blocks access to information; legally, it exposes the organization to accessibility lawsuits under standards like the ADA or EAA.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">1. Use a contrast checker tool to identify the current ratio between the foreground text and background color. 2. Adjust the CSS color value for the .c-link--branded class to a shade that meets the minimum contrast ratio of 4.5:1 for normal text. 3. Verify the new color remains accessible across both light and dark themes if applicable.</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;p&gt;
+    &lt;a class=&quot;c-link c-link--branded fw-medium&quot; aria-label=&quot;DEV Community Home&quot; href=&quot;/&quot;&gt;DEV Community&lt;/a&gt;
+    A space to discuss and keep up software development and manage your software career
+&lt;/p&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;p&gt;
+    &lt;a class=&quot;c-link c-link--branded fw-medium&quot; style=&quot;color: #000000;&quot; aria-label=&quot;DEV Community Home&quot; href=&quot;/&quot;&gt;DEV Community&lt;/a&gt; &lt;!-- Increased color contrast to meet WCAG AA standards (min 4.5:1) --&gt;
+    A space to discuss and keep up software development and manage your software career
+&lt;/p&gt;</div></div></div>
+    <div>
+      <span class="priority">P1 - Fix this sprint</span>
+      &nbsp;<a class="wcag-link" href="https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=playwright" target="_blank" rel="noopener">WCAG 2aa, 1.43 ↗</a>
+      <span style="float:right;font-size:0.8rem;color:#999">3 element(s) affected</span>
+    </div>
+  </div>
+</div>
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-serious">serious</span>
+    <span class="card-title">Several links on the page are empty and contain no text, meaning they have no name for assistive technology to announce.<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">link-name</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Blind and low-vision users using screen readers (like NVDA or JAWS) and users of voice control software. Screen readers cannot announce the purpose of the link, and voice control users cannot trigger the link by speaking its name.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I am navigating the page by jumping from link to link using my screen reader. Suddenly, I hear the word &#039;link&#039; but no description follows. I have no idea where this link leads or what it does, leaving me guessing whether to click it or ignore it.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">Without discernible text, a link is functionally invisible to non-visual users. This is a direct violation of WCAG 2.4.4 and 4.1.2, creating a significant accessibility barrier that increases legal risk under the ADA and EAA.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">Add descriptive, meaningful text between the opening and closing anchor tags. If the link is intended to be an icon, add an aria-label attribute to the link element to provide a text alternative.</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;a name=&quot;add-a-new-badge-to-your-dev-profile&quot; href=&quot;#add-a-new-badge-to-your-dev-profile&quot;&gt;  &lt;/a&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;a name=&quot;add-a-new-badge-to-your-dev-profile&quot; href=&quot;#add-a-new-badge-to-your-dev-profile&quot;&gt;Add a new badge to your dev profile&lt;/a&gt; &lt;!-- Added descriptive text to provide an accessible name --&gt;</div></div></div>
+    <div>
+      <span class="priority">P1 - Fix this sprint</span>
+      &nbsp;<a class="wcag-link" href="https://dequeuniversity.com/rules/axe/4.11/link-name?application=playwright" target="_blank" rel="noopener">WCAG 2a, 2.44, 4.12 ↗</a>
+      <span style="float:right;font-size:0.8rem;color:#999">4 element(s) affected</span>
+    </div>
+  </div>
+</div>
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-serious">serious</span>
+    <span class="card-title">Interactive elements, such as buttons or links, are nested inside one another, which is invalid HTML and confuses assistive technologies.<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">nested-interactive</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Screen reader users (NVDA, JAWS, VoiceOver) and keyboard-only users. Screen readers often ignore the inner interactive element or fail to announce its role, and keyboard focus may skip the inner element entirely.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I Tab to the &#039;Jess Lee profile details&#039; button, but I cannot reach the specific link or button hidden inside it. When I press Enter, the outer button triggers, but I have no way to activate the inner control, leaving me unable to access the specific action I need.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">This is a violation of WCAG 4.1.2 (Name, Role, Value) and 2.1.1 (Keyboard). Legally, it creates a significant accessibility barrier; practically, it renders nested functionality unreachable for anyone not using a mouse.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">1. Remove the inner interactive element from inside the outer button. 2. Restructure the HTML so that the interactive elements are siblings (placed next to each other) rather than nested. 3. Use CSS positioning or a wrapper div to maintain the desired visual layout without nesting interactive roles.</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;a href=&quot;/profile/jess-lee&quot;&gt;
+&lt;button id=&quot;story-author-preview...&quot; aria-controls=&quot;story-author-preview...&quot; class=&quot;profile-preview-card...&quot; aria-label=&quot;Jess Lee profile det...&quot; aria-expanded=&quot;false&quot; aria-haspopup=&quot;true&quot; data-dropdown-initia...=&quot;true&quot; data-initialized=&quot;true&quot;&gt;Jess Lee&lt;/button&gt;
+&lt;/a&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;div class=&quot;profile-preview-container&quot;&gt;
+&lt;button id=&quot;story-author-preview...&quot; aria-controls=&quot;story-author-preview...&quot; class=&quot;profile-preview-card...&quot; aria-label=&quot;Jess Lee profile det...&quot; aria-expanded=&quot;false&quot; aria-haspopup=&quot;true&quot; data-dropdown-initia...=&quot;true&quot; data-initialized=&quot;true&quot;&gt;Jess Lee&lt;/button&gt;
+&lt;/div&gt; &lt;!-- Removed wrapping anchor tag to resolve nested-interactive violation --&gt;</div></div></div>
+    <div>
+      <span class="priority">P1 - Fix this sprint</span>
+      &nbsp;<a class="wcag-link" href="https://dequeuniversity.com/rules/axe/4.11/nested-interactive?application=playwright" target="_blank" rel="noopener">WCAG 2a, 4.12 ↗</a>
+      <span style="float:right;font-size:0.8rem;color:#999">2 element(s) affected</span>
+    </div>
+  </div>
+</div>
+<div class="card open">
+  <div class="card-header">
+    <span class="badge badge-moderate">moderate</span>
+    <span class="card-title">The heading levels are not in a sequential order, skipping a level (e.g., jumping from H1 to H3).<span class="ai-badge">✨ Gemma4</span></span>
+    <span class="card-id">heading-order</span>
+    <span class="toggle-icon">▾</span>
+  </div>
+  <div class="card-body">
+    <div class="section">
+      <div class="section-label">👥 Who is affected</div>
+      <div class="section-content">Screen reader users (blind or low-vision) who use heading navigation shortcuts to map out the page structure.</div>
+    </div>
+    
+    <div class="section">
+      <div class="section-label">🧑‍🦯 User experience</div>
+      <div class="user-experience">I am pressing the &#039;H&#039; key to skim the page and find the section on adding badges. I jump from the main page title straight to a level 3 heading, which makes me pause and wonder if I&#039;ve accidentally skipped a major section of instructions or a prerequisite step.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">⚠️ Why it matters</div>
+      <div class="section-content">Consistent heading hierarchy is critical for WCAG 1.3.1 (Info and Relationships). When levels are skipped, the structural relationship between content is lost, creating confusion and increasing cognitive load for users who cannot see the visual layout.</div>
+    </div>
+    <div class="section">
+      <div class="section-label">🔧 How to fix</div>
+      <div class="section-content">Review the heading hierarchy of the entire page. Ensure there is one H1 for the main title and that subsequent sections use H2, then H3, without skipping levels. Change this H3 to an H2 if it represents a primary section of the page.</div>
+    </div>
+    <div class="section"><div class="section-label">💻 Code example</div><div class="code-before"><div class="code-label">Before</div><div class="code-block">&lt;h3&gt;  &lt;a name=&quot;add-a-new-badge-to-your-dev-profile&quot; href=&quot;#add-a-new-badge-to-your-dev-profile&quot;&gt;  &lt;/a&gt;  Add a new badge to your DEV profile&lt;/h3&gt;</div></div><div class="code-after" style="margin-top:0.5rem"><div class="code-label">After</div><div class="code-block">&lt;h2&gt;  &lt;a name=&quot;add-a-new-badge-to-your-dev-profile&quot; href=&quot;#add-a-new-badge-to-your-dev-profile&quot;&gt;  &lt;/a&gt;  Add a new badge to your DEV profile&lt;/h2&gt; &lt;!-- Changed h3 to h2 to maintain sequential heading order and avoid skipping levels --&gt;</div></div></div>
+    <div>
+      <span class="priority">P2 - Fix soon</span>
+      
+      <span style="float:right;font-size:0.8rem;color:#999">1 element(s) affected</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Generated by <strong>Accessibility Guardian</strong> · axe-core + Gemma4 via Ollama ·
+  <a href="https://github.com/accessibility-guardian" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<script>
+document.querySelectorAll('.card-header').forEach(h => {
+  h.addEventListener('click', () => {
+    h.closest('.card').classList.toggle('open');
+    const body = h.nextElementSibling;
+    body.hidden = !body.hidden;
+  });
+});
+</script>
+</body>
+</html>
