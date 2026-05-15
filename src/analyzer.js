@@ -1,9 +1,9 @@
 'use strict';
 
 const { buildViolationPrompt } = require('./prompts');
+const ollamaAdapter = require('./adapters/ollama');
+const googleAiAdapter = require('./adapters/google-ai');
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate';
-const MODEL = 'gemma4:latest';
 const BATCH_SIZE = 3;
 
 const IMPACT_TO_PRIORITY = {
@@ -13,8 +13,24 @@ const IMPACT_TO_PRIORITY = {
   minor: 'P3 - Fix when possible',
 };
 
-async function analyze(scanResult, onProgress) {
+function resolveConfig(overrides = {}) {
+  const backend = overrides.backend || process.env.GEMMA_BACKEND || 'ollama';
+  return {
+    backend,
+    url: overrides.url || process.env.OLLAMA_URL || 'http://localhost:11434/api/generate',
+    model: overrides.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-3-27b-it' : 'gemma4:latest'),
+    apiKey: overrides.apiKey || process.env.GEMMA_API_KEY || process.env.OLLAMA_API_KEY || null,
+  };
+}
+
+function getAdapter(backend) {
+  if (backend === 'google-ai') return googleAiAdapter;
+  return ollamaAdapter;
+}
+
+async function analyze(scanResult, onProgress, configOverrides = {}) {
   const { violations } = scanResult;
+  const config = resolveConfig(configOverrides);
 
   if (violations.length === 0) {
     return { ...scanResult, violations: [] };
@@ -27,7 +43,7 @@ async function analyze(scanResult, onProgress) {
     const results = await Promise.all(
       batch.map((v, idx) => {
         if (onProgress) onProgress(i + idx + 1, violations.length, v.id);
-        return enrichViolation(v);
+        return enrichViolation(v, config);
       })
     );
     enriched.push(...results);
@@ -36,35 +52,21 @@ async function analyze(scanResult, onProgress) {
   return { ...scanResult, violations: enriched };
 }
 
-async function enrichViolation(violation) {
+async function enrichViolation(violation, config) {
   try {
     const prompt = buildViolationPrompt(violation);
-    const response = await fetch(OLLAMA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        prompt,
-        stream: false,
-        options: { temperature: 0.2, num_predict: 1024 },
-      }),
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Ollama HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    const parsed = parseGemmaResponse(data.response);
-
-    return { ...violation, ...parsed, aiEnriched: true };
+    const adapter = getAdapter(config.backend);
+    const text = await adapter.generate(prompt, config);
+    const parsed = parseGemmaResponse(text);
+    return { ...violation, ...parsed, aiEnriched: true, aiBackend: config.backend };
   } catch (err) {
     return {
       ...violation,
       summary: violation.help,
       affectedUsers: 'Users relying on assistive technologies',
-      whyItMatters: `Violates WCAG ${violation.wcagCriteria.join(', ')}. See: ${violation.helpUrl}`,
+      whyItMatters: violation.wcagCriteria.length
+        ? `Violates WCAG ${violation.wcagCriteria.join(', ')}. See: ${violation.helpUrl}`
+        : `Best practice violation. See: ${violation.helpUrl}`,
       howToFix: violation.description,
       codeExample: { before: violation.nodes[0]?.html || '', after: '' },
       priority: IMPACT_TO_PRIORITY[violation.impact] || 'P2 - Fix soon',

@@ -10,13 +10,32 @@ const { reportCLI, reportHTML, reportJSON, writeReport } = require('./reporter')
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.url) {
-  console.error('Usage: node src/cli.js --url <url> [--format cli|html|json] [--output <path>] [--no-ai]');
-  console.error('Example: node src/cli.js --url https://example.com --format html --output report.html');
+  console.error('Usage: node src/cli.js --url <url> [options]');
+  console.error('');
+  console.error('Options:');
+  console.error('  --format cli|html|json    Output format (default: cli)');
+  console.error('  --output <path>           Write report to file');
+  console.error('  --no-ai                   Skip AI analysis, show raw axe-core output');
+  console.error('  --backend ollama|google-ai Backend to use (default: ollama, env: GEMMA_BACKEND)');
+  console.error('  --model <name>            Model name (env: OLLAMA_MODEL)');
+  console.error('  --ollama-url <url>        Ollama endpoint (env: OLLAMA_URL)');
+  console.error('  --api-key <key>           API key for remote/Google AI endpoints (env: GEMMA_API_KEY)');
+  console.error('');
+  console.error('Examples:');
+  console.error('  node src/cli.js --url https://example.com');
+  console.error('  node src/cli.js --url https://example.com --format html --output report.html');
+  console.error('  node src/cli.js --url https://example.com --backend google-ai --api-key AIza...');
   process.exit(1);
 }
 
 const format = args.format || 'cli';
 const noAI = args['no-ai'] === true;
+const aiConfig = {
+  backend: args.backend,
+  url: args['ollama-url'],
+  model: args.model,
+  apiKey: args['api-key'],
+};
 
 (async () => {
   try {
@@ -30,10 +49,12 @@ const noAI = args['no-ai'] === true;
     let result = fallbackEnrich(scanResult);
 
     if (!noAI && scanResult.violationCount > 0) {
-      process.stdout.write(`\n🤖 Analyzing with Gemma4 (${scanResult.violationCount} violations)...\n`);
+      const backend = aiConfig.backend || process.env.GEMMA_BACKEND || 'ollama';
+      const model = aiConfig.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-3-27b-it' : 'gemma4:latest');
+      process.stdout.write(`\n🤖 Analyzing with ${model} [${backend}] (${scanResult.violationCount} violations)...\n`);
       result = await analyze(scanResult, (current, total, id) => {
         process.stdout.write(`   [${current}/${total}] ${id}\n`);
-      });
+      }, aiConfig);
       process.stdout.write(`✅ Analysis complete\n`);
     }
 
@@ -58,8 +79,9 @@ const noAI = args['no-ai'] === true;
     console.error(`\n❌ Error: ${err.message}`);
     if (err.message.includes('Executable doesn')) {
       console.error('   Run: npx playwright install chromium');
-    } else if (err.message.includes('localhost:11434')) {
+    } else if (err.message.includes('localhost:11434') || err.message.includes('ECONNREFUSED')) {
       console.error('   Ollama not running. Start it with: ollama serve');
+      console.error('   Or point to a remote endpoint with --ollama-url');
     }
     process.exit(1);
   }
