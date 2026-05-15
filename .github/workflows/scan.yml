@@ -25,9 +25,6 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -50,9 +47,11 @@ jobs:
 
       - name: Restore previous reports from gh-pages
         run: |
-          git fetch origin gh-pages --depth=1 2>/dev/null || true
           mkdir -p _site/reports
-          git checkout origin/gh-pages -- reports 2>/dev/null && mv reports _site/reports || true
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            git checkout origin/gh-pages -- reports 2>/dev/null && cp -r reports/. _site/reports/ && rm -rf reports || true
+          fi
 
       - name: Run accessibility scan
         run: node src/cli.js --url "$SCAN_URL" --backend google-ai --model "$SCAN_MODEL" --api-key "$SCAN_API_KEY" --format html --output "_site/reports/$REPORT_ID/index.html"
@@ -73,11 +72,8 @@ jobs:
           path: _site/reports/${{ env.REPORT_ID }}/index.html
           retention-days: 30
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
       - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
