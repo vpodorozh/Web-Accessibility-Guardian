@@ -5,26 +5,25 @@ function buildViolationPrompt(violation) {
   const nodeHtml = exampleNode ? exampleNode.html.slice(0, 300) : 'N/A';
   const wcag = violation.wcagCriteria.length > 0 ? violation.wcagCriteria.join(', ') : 'best-practice';
 
-  return `You are an accessibility expert helping developers fix WCAG violations.
+  return `You are an accessibility expert. Output ONLY a JSON object. No preamble, no explanation, no markdown fences. Start your response with { and end with }.
 
-Analyze this accessibility violation and respond with ONLY a valid JSON object (no markdown, no explanation outside the JSON):
+Input:
+- id: ${violation.id}
+- impact: ${violation.impact}
+- description: ${violation.description}
+- wcag: ${wcag}
+- html: ${nodeHtml}
+- affected elements: ${violation.nodeCount}
 
-Violation ID: ${violation.id}
-Impact: ${violation.impact}
-Description: ${violation.description}
-WCAG Criteria: ${wcag}
-Example affected HTML: ${nodeHtml}
-Number of affected elements: ${violation.nodeCount}
-
-Respond with this exact JSON structure:
+Required JSON:
 {
-  "summary": "1-2 sentence plain-language description of what the problem is",
-  "affectedUsers": "Specific groups of people impacted (e.g., screen reader users, keyboard-only users, people with low vision)",
-  "whyItMatters": "Why this matters legally and practically, referencing the WCAG criterion",
-  "howToFix": "Step-by-step plain English instructions to fix this issue",
+  "summary": "1-2 sentence plain-language description of the problem",
+  "affectedUsers": "specific groups impacted, e.g. screen reader users, keyboard-only users, people with low vision",
+  "whyItMatters": "why this matters practically and legally, referencing the WCAG criterion",
+  "howToFix": "step-by-step plain English instructions to fix this",
   "codeExample": {
-    "before": "the problematic code snippet",
-    "after": "the corrected code snippet with a brief comment explaining the fix"
+    "before": "the problematic code",
+    "after": "the corrected code with a comment explaining the fix"
   },
   "priority": "one of: P0 - Fix immediately, P1 - Fix this sprint, P2 - Fix soon, P3 - Fix when possible"
 }`;

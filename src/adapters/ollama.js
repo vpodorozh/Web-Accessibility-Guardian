@@ -11,7 +11,7 @@ async function generate(prompt, config) {
       model: config.model,
       prompt,
       stream: false,
-      options: { temperature: 0.2, num_predict: 1024 },
+      options: { temperature: 0.2, num_predict: 2048 },
     }),
     signal: AbortSignal.timeout(60000),
   });

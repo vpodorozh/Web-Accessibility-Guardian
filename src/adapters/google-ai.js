@@ -5,7 +5,7 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 async function generate(prompt, config) {
   if (!config.apiKey) throw new Error('Google AI requires an API key (--api-key or GEMMA_API_KEY env var)');
 
-  const model = config.model || 'gemma-4-31b-it';
+  const model = config.model || 'gemma-4-26b-a4b-it';
   const url = `${BASE_URL}/${model}:generateContent?key=${config.apiKey}`;
 
   const response = await fetch(url, {
@@ -13,7 +13,7 @@ async function generate(prompt, config) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
     }),
     signal: AbortSignal.timeout(60000),
   });
@@ -24,7 +24,9 @@ async function generate(prompt, config) {
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  // Filter out thinking/reasoning parts (thought: true) — take only the actual response
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const text = parts.filter(p => !p.thought).map(p => p.text).join('').trim();
   if (!text) throw new Error('Empty response from Google AI');
   return text;
 }

@@ -14,7 +14,7 @@ on:
       model:
         description: 'Model name (default: gemma-4-31b-it)'
         required: false
-        default: 'gemma-4-31b-it'
+        default: 'gemma-4-26b-a4b-it'
         type: string
 
 # Only one scan runs at a time. Concurrent triggers queue and wait.

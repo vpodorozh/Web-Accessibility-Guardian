@@ -18,7 +18,7 @@ function resolveConfig(overrides = {}) {
   return {
     backend,
     url: overrides.url || process.env.OLLAMA_URL || 'http://localhost:11434/api/generate',
-    model: overrides.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-4-31b-it' : 'gemma4:latest'),
+    model: overrides.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-4-26b-a4b-it' : 'gemma4:latest'),
     apiKey: overrides.apiKey || process.env.GEMMA_API_KEY || process.env.OLLAMA_API_KEY || null,
   };
 }
