@@ -8,6 +8,7 @@ const { scan } = require('./scanner');
 const { analyze, fallbackEnrich } = require('./analyzer');
 const { reportCLI, reportHTML, reportJSON, writeReport } = require('./reporter');
 const { summarize } = require('./summarizer');
+const { resolveConfig } = require('./analyzer');
 
 const args = parseArgs(process.argv.slice(2));
 
@@ -54,9 +55,7 @@ const aiConfig = {
     let result = fallbackEnrich(scanResult);
 
     if (!noAI && scanResult.violationCount > 0) {
-      const backend = aiConfig.backend || process.env.GEMMA_BACKEND || 'ollama';
-      const DEFAULT_MODEL = { 'google-ai': 'gemma-4-26b-a4b-it', 'openrouter': 'google/gemma-4-31b-it:free', 'ollama': 'gemma4:latest' };
-      const model = aiConfig.model || process.env.OLLAMA_MODEL || DEFAULT_MODEL[backend] || 'gemma4:latest';
+      const { backend, model } = resolveConfig(aiConfig);
       process.stdout.write(`\n🤖 Analyzing with ${model} [${backend}] (${scanResult.violationCount} violations)...\n`);
       result = await analyze(scanResult, (current, total, id) => {
         process.stdout.write(`   [${current}/${total}] ${id}\n`);

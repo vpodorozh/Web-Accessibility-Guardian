@@ -160,16 +160,19 @@ function fallbackEnrich(scanResult) {
   };
 }
 
-async function withRetry(fn, retries = 3) {
+async function withRetry(fn, retries = 4) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       if (attempt === retries) throw err;
-      const isRateLimit = err.message.includes('429');
-      const delay = isRateLimit
+      const is429 = err.message.includes('429');
+      const is5xx = /HTTP 5\d\d/.test(err.message);
+      const delay = is429
         ? RATE_LIMIT_DELAY_MS * (attempt + 1)
-        : RETRY_DELAY_MS * (attempt + 1);
+        : is5xx
+          ? RATE_LIMIT_DELAY_MS * (attempt + 1)  // server errors need same long back-off
+          : RETRY_DELAY_MS * (attempt + 1);
       process.stderr.write(`   ↻ retrying in ${delay / 1000}s (${err.message.slice(0, 80)})\n`);
       await new Promise(r => setTimeout(r, delay));
     }
