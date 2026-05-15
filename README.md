@@ -1,6 +1,6 @@
 # ♿ Accessibility Guardian
 
-> Scan any website for WCAG violations. Get plain-language explanations and developer fixes — powered by **Gemma4** running locally via Ollama.
+> Scan any website for WCAG violations. Get plain-language explanations and developer fixes — powered by **Gemma4** locally via Ollama or via Google AI API.
 
 Built for the [DEV.to × Google Gemma 2026 Challenge](https://dev.to/challenges/google-gemma-2026-05-06).
 
@@ -26,7 +26,7 @@ Playwright Chromium (headless browser)
 axe-core (WCAG audit engine)
     │   finds violations, passes, incompletes
     ▼
-Gemma4 via Ollama (local LLM)
+Gemma4 — local (Ollama) or hosted (Google AI API)
     │   explains each violation in plain language
     ▼
 Report: CLI · HTML · JSON
@@ -48,9 +48,9 @@ For each violation, Gemma4 generates:
 ## Why Gemma4?
 
 - **Local execution** — no API costs, no data sent to external servers. Critical for agencies and public institutions handling sensitive content.
-- **Privacy-safe** — URLs and page content never leave your machine.
-- **Instruction-following** — Gemma4's structured JSON output is reliable enough to parse programmatically.
-- **Fast enough** — Local inference on modern hardware processes each violation in ~5-10 seconds, acceptable for a developer tool.
+- **Privacy-safe** — URLs and page content never leave your machine when using Ollama.
+- **Hosted option** — Google AI API gives you Gemma4 without a GPU, useful for CI/CD pipelines.
+- **Instruction-following** — Gemma4's structured output is reliable enough to parse programmatically.
 
 ---
 
@@ -58,32 +58,34 @@ For each violation, Gemma4 generates:
 
 **Prerequisites:**
 - Node.js 18+
-- [Ollama](https://ollama.ai) with `gemma4:latest`
+- [Ollama](https://ollama.ai) with `gemma4:latest` **or** a [Google AI Studio](https://aistudio.google.com/apikey) API key
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-username/accessibility-guardian
-cd accessibility-guardian
+git clone https://github.com/vpodorozh/Web-Accessibility-Guardian
+cd Web-Accessibility-Guardian
 npm install
 
 # 2. Install Playwright browser
 npx playwright install chromium
+```
 
-# 3. Pull the model (if you haven't already)
+**For local Ollama backend:**
+```bash
 ollama pull gemma4
-
-# 4. Start Ollama
 ollama serve
 ```
+
+**For Google AI backend** — get a free API key at https://aistudio.google.com/apikey (no GPU needed).
 
 ---
 
 ## Usage
 
-### CLI
+### CLI — local Ollama (default)
 
 ```bash
-# Scan with AI analysis (default)
+# Scan with AI analysis
 node src/cli.js --url https://your-site.com
 
 # Generate HTML report
@@ -96,14 +98,77 @@ node src/cli.js --url https://your-site.com --format json > report.json
 node src/cli.js --url https://your-site.com --no-ai
 ```
 
+### CLI — Google AI API
+
+```bash
+# Use Google AI (no local GPU needed)
+node src/cli.js --url https://your-site.com --backend google-ai --api-key YOUR_GEMINI_KEY
+
+# Save as HTML report
+node src/cli.js --url https://your-site.com \
+  --backend google-ai \
+  --api-key YOUR_GEMINI_KEY \
+  --format html \
+  --output report.html
+
+# Or set via environment variables
+export GEMMA_BACKEND=google-ai
+export GEMMA_API_KEY=YOUR_GEMINI_KEY
+node src/cli.js --url https://your-site.com
+```
+
 ### Web UI
 
 ```bash
+# Local Ollama
 node src/server.js
+
+# Google AI
+GEMMA_BACKEND=google-ai GEMMA_API_KEY=YOUR_GEMINI_KEY node src/server.js
+
 # Open http://localhost:3000
 ```
 
-Enter a URL, click Scan, watch the live progress as Playwright scans and Gemma4 analyzes. The full HTML report renders inline.
+---
+
+## GitHub Actions Pipeline
+
+The repo includes a manual workflow that scans any URL and publishes an HTML report to **GitHub Pages** — no local setup needed.
+
+**Setup:**
+1. Add your Gemini API key as a repository secret named `GEMMA_API_KEY`:
+   `Settings → Secrets and variables → Actions → New repository secret`
+2. Enable GitHub Pages:
+   `Settings → Pages → Source → GitHub Actions`
+
+**Run a scan:**
+`Actions → Accessibility Scan → Run workflow` → enter a URL → Run.
+
+The report is published to your Pages URL. The last 7 days of reports are kept and listed on the index page.
+
+> **Pipeline report history:** `https://vpodorozh.github.io/Web-Accessibility-Guardian/`
+
+---
+
+## Google AI API — Rate Limits
+
+The free tier of Google AI Studio has strict rate limits. Keep these in mind:
+
+| Tier | Requests per minute | Notes |
+|---|---|---|
+| **Free** | ~2 req/min | Violations are processed sequentially with automatic retry |
+| **Pay-as-you-go** | Much higher | Set up billing in Google Cloud for unthrottled scans |
+
+Since each violation makes 2 API calls (explanation + code fix), a page with 10 violations will take ~2–3 minutes on the free tier. The tool retries automatically on rate limit errors and logs retries in the output:
+
+```
+   [1/10] color-contrast
+   ↻ retrying in 3s (HTTP 429 Too Many Requests)
+   [2/10] image-alt
+   ...
+```
+
+To avoid rate limits entirely, use the local **Ollama** backend.
 
 ---
 
@@ -133,9 +198,27 @@ Priority: P1 - Fix this sprint
 
 ---
 
+## Configuration
+
+All options can be set via CLI flags or environment variables:
+
+| Flag | Env var | Default | Description |
+|---|---|---|---|
+| `--backend` | `GEMMA_BACKEND` | `ollama` | `ollama` or `google-ai` |
+| `--api-key` | `GEMMA_API_KEY` | — | API key for Google AI |
+| `--model` | `OLLAMA_MODEL` | `gemma4:latest` / `gemma-4-26b-a4b-it` | Model name |
+| `--ollama-url` | `OLLAMA_URL` | `http://localhost:11434/api/generate` | Custom Ollama endpoint |
+| `--format` | — | `cli` | `cli`, `html`, or `json` |
+| `--output` | — | — | File path for HTML/JSON report |
+| `--no-ai` | — | — | Skip AI, return raw axe-core data |
+
+Copy `.env.example` to `.env` to persist your configuration locally.
+
+---
+
 ## Audience
 
-- **Developers** — integrate into CI/CD pipeline via JSON output
+- **Developers** — integrate into CI/CD pipeline via JSON output or GitHub Actions
 - **Agencies** — generate HTML reports for client deliverables
 - **Public institutions** — meet BITV 2.0 / WCAG 2.1 AA legal requirements
 - **E-commerce** — ensure checkout flows are accessible to all users
@@ -146,22 +229,31 @@ Priority: P1 - Fix this sprint
 
 ```
 src/
-  cli.js        CLI entry point
-  server.js     Express web UI
-  scanner.js    Playwright + axe-core
-  analyzer.js   Ollama/Gemma4 integration
-  reporter.js   CLI/HTML/JSON output
-  prompts.js    Gemma4 prompt templates
+  cli.js                  CLI entry point
+  server.js               Express web UI
+  scanner.js              Playwright + axe-core
+  analyzer.js             AI orchestration (sequential, with retry)
+  reporter.js             CLI/HTML/JSON output
+  prompts.js              Gemma4 prompt templates
+  adapters/
+    ollama.js             Local Ollama backend
+    google-ai.js          Google AI API backend
+  build-index.js          GitHub Pages index generator
+  fetch-reports-artifact.js  CI artifact restore helper
 public/
-  index.html    Web UI
+  index.html              Web UI
+.github/workflows/
+  scan.yml                Manual scan + Pages deploy pipeline
 ```
 
 ---
 
 ## Roadmap
 
+- [x] GitHub Actions pipeline with manual trigger
+- [x] 7-day report history on GitHub Pages
+- [x] Google AI (Gemma4 hosted) backend
 - [ ] Multi-page crawling
-- [ ] CI/CD GitHub Action
 - [ ] PDF report export
 - [ ] Automated PR comment with violations diff
 - [ ] BITV 2.0 (German) compliance mode
