@@ -5,7 +5,7 @@ const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 async function generate(prompt, config) {
   if (!config.apiKey) throw new Error('Google AI requires an API key (--api-key or GEMMA_API_KEY env var)');
 
-  const model = config.model || 'gemma-3-27b-it';
+  const model = config.model || 'gemma-4-31b-it';
   const url = `${BASE_URL}/${model}:generateContent?key=${config.apiKey}`;
 
   const response = await fetch(url, {

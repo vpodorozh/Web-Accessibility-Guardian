@@ -50,7 +50,7 @@ const aiConfig = {
 
     if (!noAI && scanResult.violationCount > 0) {
       const backend = aiConfig.backend || process.env.GEMMA_BACKEND || 'ollama';
-      const model = aiConfig.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-3-27b-it' : 'gemma4:latest');
+      const model = aiConfig.model || process.env.OLLAMA_MODEL || (backend === 'google-ai' ? 'gemma-4-31b-it' : 'gemma4:latest');
       process.stdout.write(`\n🤖 Analyzing with ${model} [${backend}] (${scanResult.violationCount} violations)...\n`);
       result = await analyze(scanResult, (current, total, id) => {
         process.stdout.write(`   [${current}/${total}] ${id}\n`);

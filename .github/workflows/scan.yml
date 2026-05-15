@@ -12,9 +12,9 @@ on:
         required: false
         type: string
       model:
-        description: 'Model name (default: gemma-3-27b-it)'
+        description: 'Model name (default: gemma-4-31b-it)'
         required: false
-        default: 'gemma-3-27b-it'
+        default: 'gemma-4-31b-it'
         type: string
 
 jobs:
