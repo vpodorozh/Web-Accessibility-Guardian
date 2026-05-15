@@ -55,7 +55,20 @@ const aiConfig = {
       result = await analyze(scanResult, (current, total, id) => {
         process.stdout.write(`   [${current}/${total}] ${id}\n`);
       }, aiConfig);
-      process.stdout.write(`✅ Analysis complete\n`);
+
+      const enriched = result.violations.filter(v => v.aiEnriched).length;
+      const failed = result.violations.filter(v => !v.aiEnriched);
+
+      if (failed.length === 0) {
+        process.stdout.write(`✅ AI analysis complete (${enriched}/${result.violationCount} enriched)\n`);
+      } else {
+        process.stdout.write(`⚠️  AI analysis partial: ${enriched}/${result.violationCount} enriched, ${failed.length} failed\n`);
+        failed.forEach(v => process.stderr.write(`   ✗ [${v.id}]: ${v.aiError || 'unknown error'}\n`));
+        if (enriched === 0) {
+          process.stderr.write(`\n❌ AI analysis failed for all violations. Check your API key and backend configuration.\n`);
+          process.exitCode = 1;
+        }
+      }
     }
 
     if (format === 'json') {
